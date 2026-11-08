@@ -1,0 +1,297 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "AI Marketplace Listing Generator",
+    "description": "\nGenerate structured marketplace listings (title, description, category, condition,\nfeatures, tags) from product photos using a Vision LLM.\n\n* Images are validated and normalized with Pillow before inference.\n* Output is validated against a strict schema; malformed AI output is never returned.\n* Condition and features are based only on visible evidence.\n",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/generate-listing/": {
+      "post": {
+        "tags": [
+          "Listings"
+        ],
+        "summary": "Generate a marketplace listing from product images",
+        "description": "Upload one or more JPG/PNG/WEBP images as `multipart/form-data` using the repeated field name **`images`**. All images are treated as different views of the **same** product and produce **one** listing.\n\nCategory and condition come from fixed taxonomies. Condition and features are based only on what is visible; the service never invents specifications, brands, functionality, or warranty.",
+        "operationId": "generate_listing_api_v1_generate_listing__post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_generate_listing_api_v1_generate_listing__post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListingResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid or missing image / bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Image exceeds the size limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "No product found, or AI output failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Vision provider rate limit (see Retry-After)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Vision provider unavailable, timed out, or misconfigured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Liveness check",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Body_generate_listing_api_v1_generate_listing__post": {
+        "properties": {
+          "images": {
+            "items": {
+              "type": "string",
+              "contentMediaType": "application/octet-stream"
+            },
+            "type": "array",
+            "title": "Images",
+            "description": "One or more product images (JPG, PNG, WEBP). Max 10 MB each."
+          }
+        },
+        "type": "object",
+        "required": [
+          "images"
+        ],
+        "title": "Body_generate_listing_api_v1_generate_listing__post"
+      },
+      "Category": {
+        "type": "string",
+        "enum": [
+          "Electronics",
+          "Mobiles and Tablets",
+          "Fashion",
+          "Vehicles",
+          "Home and Living",
+          "Tools and Industrial"
+        ],
+        "title": "Category"
+      },
+      "Condition": {
+        "type": "string",
+        "enum": [
+          "Brand New",
+          "Like New",
+          "Used - Good Condition",
+          "Used - Fair Condition",
+          "Poor Condition",
+          "Unable to Determine"
+        ],
+        "title": "Condition"
+      },
+      "ErrorBody": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "examples": [
+              "invalid_image"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "examples": [
+              "Image 2: The uploaded file is not a readable image."
+            ]
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id",
+            "examples": [
+              "3f9c1a7e5b2d4c60"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "request_id"
+        ],
+        "title": "ErrorBody"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          }
+        },
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "title": "ErrorResponse"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "ok"
+          }
+        },
+        "type": "object",
+        "title": "HealthResponse"
+      },
+      "ListingResponse": {
+        "properties": {
+          "detected_item": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Detected Item"
+          },
+          "category": {
+            "$ref": "#/components/schemas/Category"
+          },
+          "condition_estimate": {
+            "$ref": "#/components/schemas/Condition"
+          },
+          "suggested_title": {
+            "type": "string",
+            "maxLength": 70,
+            "minLength": 1,
+            "title": "Suggested Title"
+          },
+          "suggested_description": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Suggested Description"
+          },
+          "extracted_features": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Extracted Features"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "minItems": 5,
+            "title": "Tags"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detected_item",
+          "category",
+          "condition_estimate",
+          "suggested_title",
+          "suggested_description",
+          "tags"
+        ],
+        "title": "ListingResponse",
+        "example": {
+          "category": "Mobiles and Tablets",
+          "condition_estimate": "Unable to Determine",
+          "detected_item": "Samsung Tablet with Stylus",
+          "extracted_features": [
+            "Samsung logo on rear panel",
+            "Silver back panel"
+          ],
+          "suggested_description": "Silver tablet with a visible Samsung logo on the rear panel, pictured with a white stylus.",
+          "suggested_title": "Samsung Tablet with Stylus - Silver",
+          "tags": [
+            "samsung",
+            "tablet",
+            "stylus",
+            "silver",
+            "touchscreen"
+          ]
+        }
+      }
+    }
+  }
+}

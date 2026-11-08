@@ -1,0 +1,14 @@
+.env
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+tests/
+evaluation/
+sample_images/
+streamlit_app/
+scripts/
+docs/
+*.zip
+README.md

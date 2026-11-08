@@ -1,0 +1,244 @@
+{
+  "_readme": "Each case points at one or more images (paths relative to this file). Missing images are skipped, not failed. See evaluation/README.md. Fields: id, kind (product|difficult), images[], expected_categories[], required_any[] (at least one must appear in tags/title/item), allowed_brands[] (brand names that ARE visible in the photo), allowed_specs[] (spec text that IS visible), acceptable_conditions[] (omit = any), expect_error (e.g. no_product_detected), note.",
+  "cases": [
+    {
+      "id": "shoes_brown_oxford",
+      "kind": "product",
+      "images": [
+        "../sample_images/images.jfif"
+      ],
+      "expected_categories": [
+        "Fashion"
+      ],
+      "required_any": [
+        "shoe",
+        "oxford",
+        "footwear"
+      ],
+      "allowed_brands": [],
+      "note": "Your Day 2 sample (sample_images/images.jfif)."
+    },
+    {
+      "id": "tablet_samsung",
+      "kind": "product",
+      "images": [
+        "../sample_images/Samsung-Galaxy-Tab-S10-Lite-Qmart-2.jpg"
+      ],
+      "expected_categories": [
+        "Mobiles and Tablets"
+      ],
+      "required_any": [
+        "tablet"
+      ],
+      "allowed_brands": [
+        "samsung"
+      ],
+      "note": "Samsung logo is visible on the rear panel."
+    },
+    {
+      "id": "phone_test_download",
+      "kind": "product",
+      "images": [
+        "../sample_images/test_download.jpg"
+      ],
+      "expected_categories": [
+        "Mobiles and Tablets"
+      ],
+      "required_any": [
+        "phone",
+        "smartphone"
+      ],
+      "allowed_brands": [],
+      "note": "Add 'apple'/'iphone' to allowed_brands ONLY if the logo is visible in the photo; otherwise a brand mention is a hallucination."
+    },
+    {
+      "id": "watch_test_images1",
+      "kind": "product",
+      "images": [
+        "../sample_images/test_images1.jpg"
+      ],
+      "expected_categories": [
+        "Electronics",
+        "Fashion"
+      ],
+      "required_any": [
+        "watch"
+      ],
+      "allowed_brands": [],
+      "note": "Smartwatch: Electronics or Fashion are both defensible."
+    },
+    {
+      "id": "iphone",
+      "kind": "product",
+      "images": [
+        "images/iphone.jpg"
+      ],
+      "expected_categories": [
+        "Mobiles and Tablets"
+      ],
+      "required_any": [
+        "phone",
+        "smartphone",
+        "iphone"
+      ],
+      "allowed_brands": [
+        "apple",
+        "iphone"
+      ]
+    },
+    {
+      "id": "laptop",
+      "kind": "product",
+      "images": [
+        "images/laptop.jpg"
+      ],
+      "expected_categories": [
+        "Electronics"
+      ],
+      "required_any": [
+        "laptop",
+        "notebook",
+        "computer"
+      ],
+      "allowed_brands": []
+    },
+    {
+      "id": "furniture",
+      "kind": "product",
+      "images": [
+        "images/furniture.jpg"
+      ],
+      "expected_categories": [
+        "Home and Living"
+      ],
+      "required_any": [
+        "chair",
+        "table",
+        "sofa",
+        "desk",
+        "shelf",
+        "bed",
+        "cabinet"
+      ],
+      "allowed_brands": []
+    },
+    {
+      "id": "vehicle",
+      "kind": "product",
+      "images": [
+        "images/vehicle.jpg"
+      ],
+      "expected_categories": [
+        "Vehicles"
+      ],
+      "required_any": [
+        "car",
+        "bike",
+        "motorcycle",
+        "vehicle",
+        "scooter",
+        "truck"
+      ],
+      "allowed_brands": []
+    },
+    {
+      "id": "tool",
+      "kind": "product",
+      "images": [
+        "images/tool.jpg"
+      ],
+      "expected_categories": [
+        "Tools and Industrial"
+      ],
+      "required_any": [
+        "drill",
+        "tool",
+        "wrench",
+        "hammer",
+        "saw",
+        "grinder"
+      ],
+      "allowed_brands": []
+    },
+    {
+      "id": "blurry",
+      "kind": "difficult",
+      "images": [
+        "images/blurry.jpg"
+      ],
+      "expected_categories": null,
+      "acceptable_conditions": [
+        "Unable to Determine"
+      ],
+      "allowed_brands": [],
+      "note": "Heavily blurred product photo. Must not claim a condition."
+    },
+    {
+      "id": "multiple_products",
+      "kind": "difficult",
+      "images": [
+        "images/multiple_products.jpg"
+      ],
+      "expected_categories": null,
+      "allowed_brands": [],
+      "note": "Several different items. Must still return ONE listing about the dominant item."
+    },
+    {
+      "id": "cluttered_background",
+      "kind": "difficult",
+      "images": [
+        "images/cluttered.jpg"
+      ],
+      "expected_categories": null,
+      "allowed_brands": [],
+      "note": "Product on a messy desk. Listing should ignore the clutter."
+    },
+    {
+      "id": "partial_product",
+      "kind": "difficult",
+      "images": [
+        "images/partial.jpg"
+      ],
+      "expected_categories": null,
+      "acceptable_conditions": [
+        "Unable to Determine",
+        "Used - Good Condition",
+        "Used - Fair Condition"
+      ],
+      "allowed_brands": [],
+      "note": "Only part of the product is in frame."
+    },
+    {
+      "id": "unknown_brand",
+      "kind": "difficult",
+      "images": [
+        "images/unknown_brand.jpg"
+      ],
+      "expected_categories": null,
+      "allowed_brands": [],
+      "note": "No readable brand. Any common brand name in the output counts as a hallucination."
+    },
+    {
+      "id": "dark_image",
+      "kind": "difficult",
+      "images": [
+        "images/dark.jpg"
+      ],
+      "expected_categories": null,
+      "acceptable_conditions": [
+        "Unable to Determine"
+      ],
+      "allowed_brands": [],
+      "note": "Very dark photo."
+    },
+    {
+      "id": "non_product_landscape",
+      "kind": "difficult",
+      "images": [
+        "images/landscape.jpg"
+      ],
+      "expect_error": "no_product_detected",
+      "note": "A landscape/person/document. Must be refused, not turned into a listing."
+    }
+  ]
+}
