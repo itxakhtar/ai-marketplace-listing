@@ -1,11 +1,11 @@
-"""Thin HTTP client for the FastAPI service. No Streamlit imports (unit-testable).
+﻿"""Thin HTTP client for the FastAPI service. No Streamlit imports (unit-testable).
 
 The UI talks to the API only; it never calls Gemini and never sees an API key.
 """
 
 import httpx
 
-DEFAULT_API_URL = "http://127.0.0.1:8000"
+DEFAULT_API_URL = "https://ai-marketplace-listing.onrender.com"
 DEFAULT_TIMEOUT = 120.0  # seconds; vision calls take 5-20 s, retries can double it
 GENERATE_PATH = "/api/v1/generate-listing/"
 
