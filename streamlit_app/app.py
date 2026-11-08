@@ -35,12 +35,25 @@ def init_state() -> None:
     st.session_state.setdefault("error", None)
 
 
+def default_api_url() -> str:
+    """API URL from the environment, then Streamlit secrets, then localhost."""
+    value = os.getenv("API_BASE_URL")
+    if not value:
+        try:
+            value = str(st.secrets["API_BASE_URL"])
+        except Exception:
+            value = ""
+    return value.strip() or DEFAULT_API_URL
+
+
 def render_sidebar() -> str:
     with st.sidebar:
         st.header("Settings")
-        api_url = st.text_input("API URL", value=os.getenv("API_BASE_URL", DEFAULT_API_URL), key="api_url")
+        api_url = st.text_input("API URL", value=default_api_url(), key="api_url")
         if st.button("Check API connection"):
-            if check_health(api_url):
+            with st.spinner("Contacting the API (a sleeping server can take up to a minute)..."):
+                reachable = check_health(api_url, timeout=60.0)
+            if reachable:
                 st.success("API is reachable.")
             else:
                 st.error("API is not reachable. Start it with `uvicorn app.main:app`.")
