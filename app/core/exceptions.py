@@ -84,3 +84,9 @@ class ListingValidationError(AppError):
     status_code = 422
     error_code = "ai_output_invalid"
     public_message = "The AI response could not be validated against the listing schema."
+
+
+class FeatureDisabledError(AppError):
+    status_code = 404
+    error_code = "feature_disabled"
+    public_message = "This feature is turned off."

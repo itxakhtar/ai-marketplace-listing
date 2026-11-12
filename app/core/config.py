@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     gemini_temperature: float = Field(default=0.2, ge=0.0, le=2.0)
     # Gemini 2.5 "thinking" tokens count toward this limit, so keep it generous.
     gemini_max_output_tokens: int = Field(default=4096, ge=256)
+    # Optional separate model for text-only work (description expansion); defaults to gemini_model.
+    gemini_text_model: str | None = None
+    # Image-generation model for the "related pictures" feature. Run `python -m scripts.list_models`
+    # and set GEMINI_IMAGE_MODEL to an image-capable model your key can use.
+    gemini_image_model: str = "gemini-3.6-flash-image"
     api_timeout: float = Field(default=60.0, gt=0, description="Seconds")
     # Hard ceiling for one whole /generate-listing call (all retries included).
     # Keep it below the Streamlit client's 120 s timeout.
@@ -49,6 +54,17 @@ class Settings(BaseSettings):
     max_ai_attempts: int = Field(default=2, ge=1, le=3)
     # Reject listings that state storage / RAM / battery numbers (almost always invented).
     block_unverified_specs: bool = True
+
+    # --- Marketplace extras -------------------------------------------------
+    enable_image_generation: bool = True
+    enable_description_expansion: bool = True
+    related_image_count: int = Field(default=3, ge=1, le=3)
+    image_gen_timeout: float = Field(default=75.0, gt=0, description="Seconds per generated image")
+    generated_image_max_edge: int = Field(default=1024, ge=256, le=2048)
+    # Burn a small "AI-generated" label into every generated image (strongly recommended).
+    watermark_generated_images: bool = True
+    # Hide /docs, /redoc and /openapi.json in production.
+    enable_docs: bool = True
 
     # --- Logging ---------------------------------------------------------
     log_level: str = "INFO"

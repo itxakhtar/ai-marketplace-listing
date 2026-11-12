@@ -1,4 +1,6 @@
-# AI Marketplace Listing Generator
+# SnapLot: AI Marketplace Listing Generator
+
+<img src="streamlit_app/assets/logo.svg" width="72" alt="SnapLot logo">
 
 Upload one or more photos of a product and get a **single, schema-validated marketplace listing**
 (title, description, category, condition, features, tags). Built with FastAPI and Gemini Vision, with
@@ -6,6 +8,12 @@ a Streamlit UI on top.
 
 The design goal is **honesty over fluency**: the service never invents specs, brands, accessories,
 warranty or working condition, and it never returns model output that has not passed validation.
+
+## What's new in 1.1
+* **New brand and UI:** SnapLot, a clean responsive interface with a logo, loading states and a guided flow. No API address, key or settings panel is ever shown to users.
+* **Short, then full description:** the listing starts with a short, verified description. The system can then expand it into a longer marketplace description (automatically or on a button), using only facts already in the listing.
+* **Related AI pictures:** each time photos are added or changed, three related pictures are generated (studio view, alternate angle, in context). They are **always labelled "AI-generated"**, both in the UI and burned into the image, because they are illustrations, not photos of the real item.
+* New endpoints `POST /api/v1/expand-description/` and `POST /api/v1/generate-images/`; both are optional and can be switched off.
 
 ## Features
 * `POST /api/v1/generate-listing/`: 1-6 images (JPG/PNG/WEBP) of the *same* product -> one listing.
@@ -54,6 +62,16 @@ sequenceDiagram
     A-->>C: 200 JSON (or error envelope)
 ```
 
+## How the UI flow works
+```mermaid
+flowchart LR
+    A[Add or change photos] --> B[Short description<br/>/generate-listing]
+    B --> C[Full description<br/>/expand-description]
+    C --> D[3 related AI pictures<br/>/generate-images]
+    B -. any step can fail on its own .-> E[Listing still usable]
+```
+Each stage shows its own loading state. If the full description or the pictures fail, the listing stays on screen with a retry button.
+
 ## Quick start (Windows PowerShell)
 Requires Python 3.10+ and a Gemini API key from <https://aistudio.google.com/apikey>.
 
@@ -81,6 +99,9 @@ Interactive docs: <http://127.0.0.1:8000/docs> | Health: <http://127.0.0.1:8000/
 streamlit run streamlit_app/app.py
 ```
 The UI uses `http://127.0.0.1:8000` by default; override with the `API_BASE_URL` environment variable or the sidebar.
+
+### Keeping the service address private
+The UI reads the API address from the `API_BASE_URL` environment variable (or Streamlit secret) and uses it only on the server. It is never rendered, and error messages never include it. For a deployed API, set `ENABLE_DOCS=false` to hide `/docs`, `/redoc` and `/openapi.json` as well.
 
 ### Call the API directly
 ```powershell
@@ -114,6 +135,10 @@ Full schema: [`docs/openapi.json`](docs/openapi.json) (regenerate with `python -
 Categories: Electronics, Mobiles and Tablets, Fashion, Vehicles, Home and Living, Tools and Industrial.
 Conditions: Brand New, Like New, Used - Good Condition, Used - Fair Condition, Poor Condition, Unable to Determine.
 
+**`POST /api/v1/expand-description/`** (JSON body = the listing fields) returns `{"long_description": "..."}`. The text may only use facts from the request; any number that was not in the input is rejected, and all listing guardrails apply.
+
+**`POST /api/v1/generate-images/`** (same multipart `images` as above, optional form field `detected_item`) returns `{"images": [{"label", "mime_type", "data_base64", "ai_generated": true}], "notice": "..."}`. Partial results are returned if some pictures fail; an error is returned only if all fail.
+
 **Errors** always look like `{"error": {"code", "message", "request_id"}}`:
 
 | HTTP | code | Meaning |
@@ -130,7 +155,8 @@ Conditions: Brand New, Like New, Used - Good Condition, Used - Fair Condition, P
 All settings are environment variables (or `.env`); see [`.env.example`](.env.example) for the full list.
 Common ones: `GEMINI_API_KEY` (required), `GEMINI_MODEL`, `API_TIMEOUT` (per provider call, 60 s),
 `REQUEST_TIMEOUT` (whole request, 110 s), `MAX_IMAGES_PER_REQUEST`, `MAX_IMAGE_SIZE_MB`,
-`BLOCK_UNVERIFIED_SPECS`, `LOG_LEVEL`.
+`BLOCK_UNVERIFIED_SPECS`, `LOG_LEVEL`. New: `GEMINI_IMAGE_MODEL` (run `python -m scripts.list_models` to find an image-capable model your key can use), `GEMINI_TEXT_MODEL`, `ENABLE_IMAGE_GENERATION`, `ENABLE_DESCRIPTION_EXPANSION`, `RELATED_IMAGE_COUNT`, `WATERMARK_GENERATED_IMAGES`, `ENABLE_DOCS`.
+Each related picture is a separate model call: turn `ENABLE_IMAGE_GENERATION` off or lower `RELATED_IMAGE_COUNT` to control cost.
 
 ## Edge cases and failure behaviour
 Handled without crashing or inventing data (details and per-case results in [`evaluation/EDGE_CASES.md`](evaluation/EDGE_CASES.md)):
@@ -142,7 +168,7 @@ products (dominant item only), provider outage, rate limiting, timeouts and empt
 ```powershell
 pytest -q
 ```
-166 tests; the vision provider is always mocked, so no key or network is needed.
+208 tests; the vision provider is always mocked, so no key or network is needed.
 Offline robustness check: `python -m scripts.edge_cases`.
 
 ## Evaluation
@@ -172,6 +198,8 @@ docs/           OpenAPI export, demo guide
 * There is no authentication or rate limiting in this service. Put it behind a gateway before exposing it publicly.
 
 ## Known limitations
+* Generated pictures can invent unseen details (for example the back of a device). They are labelled as AI illustrations and must not be passed off as real photos of the item.
+* The image model name and quota depend on your Gemini account; the default `gemini-3.6-flash-image` is unverified. If it is wrong, the UI shows that visuals are unavailable and the listing still works.
 * One listing per request; photos of several different products are not split.
 * Condition is an estimate from photos, and is often `Unable to Determine` for clean catalog-style shots.
 * Quality thresholds were tuned on synthetic images; calibrate them on your own photos.
