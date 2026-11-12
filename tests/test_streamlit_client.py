@@ -1,3 +1,5 @@
+import json
+
 import httpx
 import pytest
 
@@ -67,12 +69,14 @@ def test_200_with_non_object_json_is_an_error():
         generate_listing("http://api", FILES, client=client_for(lambda r: httpx.Response(200, json=[1, 2])))
 
 
-def test_connection_refused_is_unavailable_with_helpful_message():
+def test_connection_refused_message_never_reveals_the_address():
     def handler(request):
         raise httpx.ConnectError("refused")
 
-    with pytest.raises(ApiUnavailable, match="uvicorn"):
-        generate_listing("http://api", FILES, client=client_for(handler))
+    with pytest.raises(ApiUnavailable) as info:
+        generate_listing("http://secret-host.internal:8000", FILES, client=client_for(handler))
+    assert "can't reach" in str(info.value)
+    assert "secret-host" not in str(info.value) and "http" not in str(info.value)
 
 
 def test_timeout_is_unavailable():
@@ -84,7 +88,7 @@ def test_timeout_is_unavailable():
 
 
 def test_bad_url_scheme_rejected():
-    with pytest.raises(ApiUnavailable, match="http"):
+    with pytest.raises(ApiUnavailable, match="not configured"):
         generate_listing("localhost:8000", FILES, client=client_for(lambda r: httpx.Response(200, json=LISTING)))
 
 
@@ -97,3 +101,51 @@ def test_health_check_true_false():
 
     assert not check_health("http://api", client=client_for(boom))
     assert not check_health("not-a-url")
+
+
+# ---------------------------------------------------------- expand + images
+from streamlit_app.api_client import expand_description, generate_images  # noqa: E402
+
+
+def test_expand_description_sends_only_listing_fields_as_json():
+    seen = {}
+
+    def handler(request):
+        seen["body"] = json.loads(request.content)
+        seen["path"] = request.url.path
+        return httpx.Response(200, json={"long_description": "A long text"})
+
+    listing = {**LISTING, "suggested_title": "Tablet - Silver", "junk": "dropped"}
+    assert expand_description("http://api", listing, client=client_for(handler)) == "A long text"
+    assert seen["path"] == "/api/v1/expand-description/"
+    assert "junk" not in seen["body"] and seen["body"]["suggested_title"] == "Tablet - Silver"
+
+
+def test_expand_description_errors():
+    with pytest.raises(ApiError) as info:
+        expand_description(
+            "http://api",
+            LISTING,
+            client=client_for(lambda r: httpx.Response(422, json={"error": {"code": "ai_output_invalid", "message": "bad", "request_id": "r"}})),
+        )
+    assert info.value.code == "ai_output_invalid"
+    with pytest.raises(ApiError):
+        expand_description("http://api", LISTING, client=client_for(lambda r: httpx.Response(200, json={"long_description": " "})))
+
+
+def test_generate_images_posts_files_and_item_name():
+    seen = {}
+
+    def handler(request):
+        seen["body"] = request.content
+        seen["path"] = request.url.path
+        return httpx.Response(200, json={"images": [{"label": "Studio view", "data_base64": "QUJD"}, {"label": "x"}]})
+
+    out = generate_images("http://api", FILES, "Samsung Tablet", client=client_for(handler))
+    assert seen["path"] == "/api/v1/generate-images/" and b"Samsung Tablet" in seen["body"]
+    assert out == [{"label": "Studio view", "data_base64": "QUJD"}]  # entries without data are dropped
+
+
+def test_generate_images_empty_is_an_error():
+    with pytest.raises(ApiError):
+        generate_images("http://api", FILES, client=client_for(lambda r: httpx.Response(200, json={"images": []})))

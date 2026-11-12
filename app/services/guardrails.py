@@ -67,14 +67,39 @@ SPEC_RULES: tuple[Rule, ...] = (
 _INSTRUCTIONS = {r.name: r.instruction for r in (*CONTENT_RULES, *SPEC_RULES)}
 
 
+_NUMBER = re.compile(r"\d+(?:[.,]\d+)?")
+_INSTRUCTIONS["invented_number"] = "Use only numbers that appear in the provided facts. Do not add any other number."
+
+
+def _squash(text: str) -> str:
+    return re.sub(r"\s+", "", text.lower())
+
+
+def check_text(text: str, *, source: str = "", block_unverified_specs: bool = True) -> None:
+    """Rule check for free text. ``source`` is the verified fact text the output may draw on.
+
+    * Spec numbers (storage/RAM/battery) must appear in ``source`` to be allowed.
+    * If ``source`` is given, every number in ``text`` must also appear in ``source``.
+    """
+    violated = [r.name for r in CONTENT_RULES if r.pattern.search(text)]
+    src = _squash(source)
+    if block_unverified_specs:
+        for rule in SPEC_RULES:
+            if any(_squash(m.group(0)) not in src for m in rule.pattern.finditer(text)):
+                violated.append(rule.name)
+    if source:
+        known = set(_NUMBER.findall(source))
+        if any(n not in known for n in _NUMBER.findall(text)):
+            violated.append("invented_number")
+    if violated:
+        raise GuardrailViolation(violated)
+
+
 def check_guardrails(listing: ListingResponse, *, block_unverified_specs: bool = True) -> None:
     text = " | ".join(
         [listing.suggested_title, listing.suggested_description, *listing.extracted_features]
     )
-    rules = CONTENT_RULES + (SPEC_RULES if block_unverified_specs else ())
-    violated = [r.name for r in rules if r.pattern.search(text)]
-    if violated:
-        raise GuardrailViolation(violated)
+    check_text(text, block_unverified_specs=block_unverified_specs)
 
 
 def retry_feedback(rules: list[str]) -> str:

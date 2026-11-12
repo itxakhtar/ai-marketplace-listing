@@ -53,12 +53,11 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(RequestValidationError)
     async def handle_request_validation(request: Request, exc: RequestValidationError) -> JSONResponse:
-        return error_response(
-            400,
-            "invalid_request",
-            "Invalid request. Send one or more image files in the multipart field 'images'.",
-            _request_id(request),
-        )
+        if request.url.path.rstrip("/").endswith("expand-description"):
+            message = "Invalid request. Send the listing facts as JSON."
+        else:
+            message = "Invalid request. Send one or more image files in the multipart field 'images'."
+        return error_response(400, "invalid_request", message, _request_id(request))
 
     @app.exception_handler(StarletteHTTPException)
     async def handle_http_exception(request: Request, exc: StarletteHTTPException) -> JSONResponse:

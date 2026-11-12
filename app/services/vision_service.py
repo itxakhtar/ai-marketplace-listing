@@ -39,6 +39,18 @@ class VisionProvider(Protocol):
     async def analyze(self, images: Sequence[ImagePayload], prompt: str) -> str: ...
 
 
+class TextProvider(Protocol):
+    """Text-only completion (JSON out). Used for description expansion."""
+
+    async def complete(self, prompt: str) -> str: ...
+
+
+class ImageGenProvider(Protocol):
+    """Image generation from reference photos. Returns the raw encoded image bytes."""
+
+    async def generate_image(self, references: Sequence[ImagePayload], prompt: str) -> bytes: ...
+
+
 class VisionService:
     # Hard asyncio deadline = api_timeout + grace; guarantees we never hang
     # even if the SDK's own timeout does not fire.
@@ -111,6 +123,74 @@ class VisionService:
             },
         )
         return text
+
+    # ------------------------------------------------------------ text + image generation
+    async def _call(self, model: str, contents, config, *, timeout: float):
+        """One guarded provider call; every failure becomes a domain exception."""
+        try:
+            return await asyncio.wait_for(
+                self._client.aio.models.generate_content(model=model, contents=contents, config=config),
+                timeout=timeout + self._timeout_grace_s,
+            )
+        except genai_errors.APIError as exc:
+            raise self._translate_api_error(exc) from exc
+        except asyncio.TimeoutError as exc:
+            logger.warning("vision_timeout", extra={"error_type": "asyncio.TimeoutError"})
+            raise VisionTimeoutError() from exc
+        except Exception as exc:  # noqa: BLE001 - provider boundary
+            raise self._classify_unexpected(exc) from exc
+
+    async def complete(self, prompt: str) -> str:
+        """Text-only completion that returns raw JSON text."""
+        started = time.perf_counter()
+        model = self._settings.gemini_text_model or self._settings.gemini_model
+        config = types.GenerateContentConfig(
+            temperature=0.4,
+            max_output_tokens=self._settings.gemini_max_output_tokens,
+            response_mime_type="application/json",
+        )
+        response = await self._call(model, [prompt], config, timeout=self._settings.api_timeout)
+        text = (response.text or "").strip() if response is not None else ""
+        if not text:
+            raise VisionEmptyResponseError()
+        logger.info(
+            "text_call_ok",
+            extra={"duration_ms": round((time.perf_counter() - started) * 1000), "model": model},
+        )
+        return text
+
+    async def generate_image(self, references: Sequence[ImagePayload], prompt: str) -> bytes:
+        """Generate one image conditioned on the reference photos."""
+        if not references:
+            raise ValueError("At least one reference image is required.")
+        started = time.perf_counter()
+        contents: list[types.Part | str] = [
+            types.Part.from_bytes(data=img.data, mime_type=img.mime_type) for img in references
+        ]
+        contents.append(prompt)
+        config = types.GenerateContentConfig(response_modalities=["TEXT", "IMAGE"])
+        response = await self._call(
+            self._settings.gemini_image_model,
+            contents,
+            config,
+            timeout=self._settings.image_gen_timeout,
+        )
+        for candidate in getattr(response, "candidates", None) or []:
+            content = getattr(candidate, "content", None)
+            for part in getattr(content, "parts", None) or []:
+                inline = getattr(part, "inline_data", None)
+                data = getattr(inline, "data", None)
+                if data:
+                    logger.info(
+                        "image_generated",
+                        extra={
+                            "duration_ms": round((time.perf_counter() - started) * 1000),
+                            "model": self._settings.gemini_image_model,
+                        },
+                    )
+                    return bytes(data)
+        logger.warning("image_generation_empty")
+        raise VisionEmptyResponseError()
 
     @staticmethod
     def _translate_api_error(exc: genai_errors.APIError) -> VisionServiceError:

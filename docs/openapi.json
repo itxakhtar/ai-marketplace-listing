@@ -3,7 +3,7 @@
   "info": {
     "title": "AI Marketplace Listing Generator",
     "description": "\nGenerate structured marketplace listings (title, description, category, condition,\nfeatures, tags) from product photos using a Vision LLM.\n\n* Images are validated and normalized with Pillow before inference.\n* Output is validated against a strict schema; malformed AI output is never returned.\n* Condition and features are based only on visible evidence.\n",
-    "version": "1.0.0"
+    "version": "1.1.0"
   },
   "paths": {
     "/api/v1/generate-listing/": {
@@ -98,6 +98,170 @@
         }
       }
     },
+    "/api/v1/expand-description/": {
+      "post": {
+        "tags": [
+          "Listings"
+        ],
+        "summary": "Expand a short description into a longer marketplace description",
+        "description": "Send the (optionally edited) listing facts. The service writes a longer description using only those facts; output is checked by the same guardrails as listings, plus a rule that forbids any number that was not in the input.",
+        "operationId": "expand_description_api_v1_expand_description__post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpandDescriptionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpandedDescription"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid or missing input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Feature turned off",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "AI output failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Provider rate limit (see Retry-After)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Provider unavailable, timed out, or misconfigured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/generate-images/": {
+      "post": {
+        "tags": [
+          "Listings"
+        ],
+        "summary": "Generate related AI pictures from the product photo(s)",
+        "description": "Upload the same `images` as for a listing. Returns up to three AI-generated pictures (base64 JPEG), each labelled 'AI-generated'. They are illustrations, not photos of the actual item. Partial results are returned if some images fail.",
+        "operationId": "generate_images_api_v1_generate_images__post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_generate_images_api_v1_generate_images__post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelatedImagesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid or missing input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Feature turned off",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "AI output failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Provider rate limit (see Retry-After)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Provider unavailable, timed out, or misconfigured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -122,6 +286,36 @@
   },
   "components": {
     "schemas": {
+      "Body_generate_images_api_v1_generate_images__post": {
+        "properties": {
+          "images": {
+            "items": {
+              "type": "string",
+              "contentMediaType": "application/octet-stream"
+            },
+            "type": "array",
+            "title": "Images",
+            "description": "One or more product images (JPG, PNG, WEBP). Max 10 MB each."
+          },
+          "detected_item": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detected Item"
+          }
+        },
+        "type": "object",
+        "required": [
+          "images"
+        ],
+        "title": "Body_generate_images_api_v1_generate_images__post"
+      },
       "Body_generate_listing_api_v1_generate_listing__post": {
         "properties": {
           "images": {
@@ -208,6 +402,75 @@
         ],
         "title": "ErrorResponse"
       },
+      "ExpandDescriptionRequest": {
+        "properties": {
+          "detected_item": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Detected Item"
+          },
+          "category": {
+            "$ref": "#/components/schemas/Category"
+          },
+          "condition_estimate": {
+            "$ref": "#/components/schemas/Condition"
+          },
+          "suggested_title": {
+            "type": "string",
+            "maxLength": 70,
+            "minLength": 1,
+            "title": "Suggested Title"
+          },
+          "suggested_description": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Suggested Description"
+          },
+          "extracted_features": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 10,
+            "title": "Extracted Features"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 8,
+            "title": "Tags"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detected_item",
+          "category",
+          "condition_estimate",
+          "suggested_title",
+          "suggested_description"
+        ],
+        "title": "ExpandDescriptionRequest",
+        "description": "The (possibly user-edited) listing facts. Treated as untrusted data."
+      },
+      "ExpandedDescription": {
+        "properties": {
+          "long_description": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Long Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "long_description"
+        ],
+        "title": "ExpandedDescription"
+      },
       "HealthResponse": {
         "properties": {
           "status": {
@@ -291,6 +554,58 @@
             "touchscreen"
           ]
         }
+      },
+      "RelatedImage": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "examples": [
+              "Studio view"
+            ]
+          },
+          "mime_type": {
+            "type": "string",
+            "title": "Mime Type",
+            "default": "image/jpeg"
+          },
+          "data_base64": {
+            "type": "string",
+            "title": "Data Base64"
+          },
+          "ai_generated": {
+            "type": "boolean",
+            "title": "Ai Generated",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "data_base64"
+        ],
+        "title": "RelatedImage"
+      },
+      "RelatedImagesResponse": {
+        "properties": {
+          "images": {
+            "items": {
+              "$ref": "#/components/schemas/RelatedImage"
+            },
+            "type": "array",
+            "title": "Images"
+          },
+          "notice": {
+            "type": "string",
+            "title": "Notice",
+            "default": "AI-generated illustrations based on your photo. They are not photos of the actual item: do not present them to buyers as real photos."
+          }
+        },
+        "type": "object",
+        "required": [
+          "images"
+        ],
+        "title": "RelatedImagesResponse"
       }
     }
   }
